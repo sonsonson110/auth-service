@@ -17,6 +17,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -25,6 +26,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestControllerAdvice
 public class CustomRestExceptionHandler extends ResponseEntityExceptionHandler {
@@ -42,6 +44,12 @@ public class CustomRestExceptionHandler extends ResponseEntityExceptionHandler {
         });
         final var apiResponse = ApiResponse.error("Validation error", errors);
         return handleExceptionInternal(ex, apiResponse, headers, HttpStatus.BAD_REQUEST, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        final var errors = Map.of(ex.getParameterName(), List.of(ex.getParameterName() + " missing parameter"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("Validation error", errors));
     }
 
     @Override
@@ -88,7 +96,7 @@ public class CustomRestExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler({Exception.class})
     public ResponseEntity<Object> handleAll(Exception ex) {
-        logger.error(ex.getMessage());
+        logger.error(ex.getCause() + ": " + ex.getMessage());
         final var apiError = ApiResponse.error("Server error");
         return new ResponseEntity<>(apiError, new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
     }

@@ -11,8 +11,8 @@ public class ValidationException extends BusinessException{
         this.validationErrors = null;
     }
 
-    public ValidationException(String message, Map<String, List<String>> validationErrors) {
-        super(message);
+    public ValidationException(Map<String, List<String>> validationErrors) {
+        super("Validation error");
         this.validationErrors = validationErrors;
     }
 
