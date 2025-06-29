@@ -60,4 +60,11 @@ public class UserService implements UserDetailsService {
 
         userRepository.save(user);
     }
+
+    public void deleteUser(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User", userId.toString());
+        }
+        userRepository.deleteById(userId);
+    }
 }

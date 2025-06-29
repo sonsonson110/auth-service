@@ -4,11 +4,16 @@ import com.example.auth_service.dto.ApiResponse;
 import com.example.auth_service.exception.BusinessException;
 import com.example.auth_service.exception.ResourceNotFoundException;
 import com.example.auth_service.exception.ValidationException;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -63,16 +68,28 @@ public class CustomRestExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler({Exception.class})
-    public ResponseEntity<Object> handleAll(Exception ex, WebRequest request) {
-        final var apiError = ApiResponse.error("Server error");
-        return new ResponseEntity<>(
-                apiError, new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
+    @ExceptionHandler({
+            AuthenticationException.class,
+            IllegalArgumentException.class,
+            SignatureException.class,
+            MalformedJwtException.class,
+            UnsupportedJwtException.class,
+            ExpiredJwtException.class})
+    public ResponseEntity<Object> handleAuthentication(Exception ex) {
+        final var apiResponse = ApiResponse.error(ex.getMessage());
+        return new ResponseEntity<>(apiResponse, HttpStatus.UNAUTHORIZED);
     }
 
-    @ExceptionHandler({AuthenticationException.class})
-    public ResponseEntity<Object> handleAuthentication(AuthenticationException ex) {
-        final var apiResponse = ApiResponse.error("Authentication failed: " + ex.getMessage());
-        return new ResponseEntity<>(apiResponse, HttpStatus.UNAUTHORIZED);
+    @ExceptionHandler({AccessDeniedException.class})
+    public ResponseEntity<Object> handleForbidden(Exception ex) {
+        final var apiResponse = ApiResponse.error(ex.getMessage());
+        return new ResponseEntity<>(apiResponse, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler({Exception.class})
+    public ResponseEntity<Object> handleAll(Exception ex) {
+        logger.error(ex.getMessage());
+        final var apiError = ApiResponse.error("Server error");
+        return new ResponseEntity<>(apiError, new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
