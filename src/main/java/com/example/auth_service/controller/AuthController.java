@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.core.env.Environment;
 
@@ -57,7 +58,7 @@ public class AuthController {
             response.addCookie(refreshCookie);
         }
         return ResponseEntity.ok(ApiResponse.success(
-                "Login successful",
+                "Login successfully",
                 "body".equals(responseType) ? result : null));
     }
 
@@ -67,10 +68,7 @@ public class AuthController {
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
             HttpServletResponse response
     ) {
-        if (refreshToken == null) {
-            final var errors = Map.of("refreshToken", List.of("missing cookie"));
-            throw new ValidationException(errors);
-        }
+        validateRefreshToken(refreshToken);
 
         final var result = authService.refresh(refreshToken);
         if (!"body".equals(responseType)) {
@@ -82,7 +80,39 @@ public class AuthController {
             response.addCookie(accessCookie);
         }
         return ResponseEntity.ok(ApiResponse.success(
-                "Refresh access token successful",
+                "Refresh access token successfully",
                 "body".equals(responseType) ? result : null));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<?>> logout(
+            @CookieValue(name = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response) {
+        validateRefreshToken(refreshToken);
+
+        authService.logout(refreshToken);
+
+        final var accessCookie = new Cookie("accessToken", "");
+        accessCookie.setHttpOnly(true);
+        accessCookie.setPath("/");
+        accessCookie.setMaxAge(0);
+
+        final var refreshCookie = new Cookie("refreshToken", "");
+        refreshCookie.setHttpOnly(true);
+        refreshCookie.setPath("/");
+        refreshCookie.setMaxAge(0);
+
+        response.addCookie(accessCookie);
+        response.addCookie(refreshCookie);
+
+        return ResponseEntity.ok(ApiResponse.success("Logout successfully"));
+    }
+
+    private void validateRefreshToken(String refreshToken) {
+        if (refreshToken == null) {
+            final var errors = Map.of("refreshToken", List.of("missing cookie"));
+            throw new ValidationException(errors);
+        }
     }
 }

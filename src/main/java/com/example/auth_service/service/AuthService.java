@@ -5,7 +5,6 @@ import com.example.auth_service.dto.LoginResponse;
 import com.example.auth_service.dto.RefreshResponse;
 import com.example.auth_service.entity.User;
 import com.example.auth_service.entity.UserSession;
-import com.example.auth_service.exception.ResourceNotFoundException;
 import com.example.auth_service.repository.UserSessionRepository;
 import com.example.auth_service.util.JwtUtil;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,22 +12,26 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserService userService;
     private final UserSessionRepository userSessionRepository;
+    private final UserSessionService userSessionService;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             JwtUtil jwtUtil,
             UserService userService,
-            UserSessionRepository userSessionRepository) {
+            UserSessionRepository userSessionRepository, UserSessionService userSessionService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userService = userService;
         this.userSessionRepository = userSessionRepository;
+        this.userSessionService = userSessionService;
     }
 
     public LoginResponse login(LoginRequest loginRequest) throws AuthenticationException {
@@ -47,13 +50,21 @@ public class AuthService {
     }
 
     public RefreshResponse refresh(String refreshToken) {
+        //<editor-fold desc="Validation">
         final var username = jwtUtil.extractUsername(refreshToken, JwtUtil.JwtType.REFRESH);
         final var sessionId = jwtUtil.extractSessionId(refreshToken);
-        if (!userSessionRepository.existsBySessionIdAndIsRevokedFalse(sessionId)) {
-            throw new ResourceNotFoundException("User session", sessionId);
-        }
+        userSessionService.existedBySessionId(sessionId);
         final var user = userService.loadUserByUsername(username);
+        //</editor-fold>
         final var newAccessToken = jwtUtil.generateToken(user, JwtUtil.JwtType.ACCESS);
         return new RefreshResponse(newAccessToken);
+    }
+
+    public void logout(String refreshToken) {
+        final var sessionId = jwtUtil.extractSessionId(refreshToken);
+        final var userSession = userSessionService.getUserSessionByUserId(sessionId);
+        userSession.setLogoutTime(LocalDateTime.now());
+        userSession.setRevoked(true);
+        userSessionRepository.save(userSession);
     }
 }
