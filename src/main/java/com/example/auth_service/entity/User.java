@@ -1,5 +1,6 @@
 package com.example.auth_service.entity;
 
+import com.example.auth_service.entity.enums.Role;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -42,6 +43,11 @@ public class User implements UserDetails {
 
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
+
+    //<editor-fold desc="Relationship">
+    @OneToMany(mappedBy = "user")
+    private List<UserSession> sessions;
+    //</editor-fold>
 
     private boolean enabled = true;
     private boolean accountNonExpired = true;
@@ -190,8 +196,13 @@ public class User implements UserDetails {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    public List<UserSession> getSessions() {
+        return sessions;
+    }
+
+    public void setSessions(List<UserSession> sessions) {
+        this.sessions = sessions;
+    }
 }
 
-enum Role {
-    USER, ADMIN
-}

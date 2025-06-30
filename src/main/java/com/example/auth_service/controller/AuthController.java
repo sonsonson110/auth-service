@@ -47,7 +47,7 @@ public class AuthController {
             accessCookie.setPath("/");
             accessCookie.setMaxAge(accessTokenExpiration / 1000);
 
-            final var refreshCookie = new Cookie("accessToken", result.refreshToken());
+            final var refreshCookie = new Cookie("refreshToken", result.refreshToken());
             refreshCookie.setHttpOnly(true);
             refreshCookie.setSecure(isProduction);
             refreshCookie.setPath("/");

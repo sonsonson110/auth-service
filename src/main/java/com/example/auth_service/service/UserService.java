@@ -6,7 +6,6 @@ import com.example.auth_service.entity.User;
 import com.example.auth_service.exception.DuplicateResourceException;
 import com.example.auth_service.exception.ResourceNotFoundException;
 import com.example.auth_service.repository.UserRepository;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;

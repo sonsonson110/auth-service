@@ -11,12 +11,19 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.UUID;
 import java.util.function.Function;
+
 
 @Component
 public class JwtUtil {
+    public static enum JwtType {ACCESS, REFRESH}
+
     @Value("${jwt.secret}")
     private String jwtSecret;
+
+    @Value("${jwt.refreshSecret}")
+    private String refreshSecret;
 
     @Value("${jwt.access-token-expiration}")
     private int accessTokenExpiration;
@@ -24,43 +31,46 @@ public class JwtUtil {
     @Value("${jwt.refresh-token-expiration}")
     private int refreshTokenExpiration;
 
-    private Key getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
+    private Key getSigningKey(JwtType type) {
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(
+                type == JwtType.ACCESS ? jwtSecret : refreshSecret));
     }
 
-    public String generateAccessToken(User user) {
-        return generateToken(user, accessTokenExpiration);
-    }
-
-    public String generateRefreshToken(User user) {
-        return generateToken(user, refreshTokenExpiration);
-    }
-
-    private String generateToken(User user, int expiration) {
-        return Jwts.builder()
-                .setSubject(user.getId().toString())
+    public String generateToken(User user, JwtType type) {
+        final var builder = Jwts.builder();
+        builder.setSubject(user.getId().toString())
                 .claim("username", user.getUsername())
-                .claim("role", user.getRole())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+                .setIssuedAt(new Date(System.currentTimeMillis()));
+        if (type == JwtType.ACCESS) {
+            builder
+                    .claim("role", user.getRole())
+                    .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
+                    .signWith(getSigningKey(JwtType.ACCESS), SignatureAlgorithm.HS256);
+        } else {
+            builder.claim("sessionId", UUID.randomUUID().toString())
+                    .setExpiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
+                    .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(refreshSecret)), SignatureAlgorithm.HS256);
+        }
+        return builder.compact();
     }
 
-    public String extractUsername(String token) {
-        return extractClaim(token, claims -> claims.get("username", String.class));
+    public String extractUsername(String token, JwtType type) {
+        return extractClaim(token, type, claims -> claims.get("username", String.class));
     }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final var claims = extractAllClaims(token);
+    public String extractSessionId(String token) {
+        return extractClaim(token, JwtType.REFRESH, claims -> claims.get("sessionId", String.class));
+    }
+
+    public <T> T extractClaim(String token, JwtType type, Function<Claims, T> claimsResolver) {
+        final var claims = extractAllClaims(token, type);
         return claimsResolver.apply(claims);
     }
 
     // This will handle token validation first, then extract later
-    private Claims extractAllClaims(String token) {
+    private Claims extractAllClaims(String token, JwtType type) {
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(getSigningKey(type))
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
