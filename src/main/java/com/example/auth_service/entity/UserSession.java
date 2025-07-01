@@ -14,9 +14,6 @@ public class UserSession {
     @Column(name = "session_id", nullable = false)
     private String sessionId;
 
-    @Column(name = "logout_time")
-    private LocalDateTime logoutTime;
-
     @Column(name = "is_revoked", nullable = false)
     private boolean isRevoked = false;
 
@@ -66,15 +63,6 @@ public class UserSession {
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
     }
-
-    public LocalDateTime getLogoutTime() {
-        return logoutTime;
-    }
-
-    public void setLogoutTime(LocalDateTime logoutTime) {
-        this.logoutTime = logoutTime;
-    }
-
     public boolean isRevoked() {
         return isRevoked;
     }

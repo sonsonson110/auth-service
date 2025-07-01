@@ -1,7 +1,9 @@
 package com.example.auth_service.controller;
 
 import com.example.auth_service.dto.ApiResponse;
+import com.example.auth_service.dto.ForgotPasswordRequest;
 import com.example.auth_service.dto.LoginRequest;
+import com.example.auth_service.dto.ResetPasswordRequest;
 import com.example.auth_service.exception.ValidationException;
 import com.example.auth_service.service.AuthService;
 import jakarta.servlet.http.Cookie;
@@ -114,5 +116,30 @@ public class AuthController {
             final var errors = Map.of("refreshToken", List.of("missing cookie"));
             throw new ValidationException(errors);
         }
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<?>> forgotPassword(
+            @RequestBody @Valid ForgotPasswordRequest dto
+    ) {
+        authService.initiatePasswordReset(dto);
+        return ResponseEntity.ok(ApiResponse.success("Password reset link sent to your email"));
+    }
+
+    @GetMapping("/reset-password/{token}/verify")
+    public ResponseEntity<ApiResponse<?>> verifyResetPasswordToken(
+            @PathVariable String token
+    ) {
+        authService.validatePasswordResetToken(token);
+        return ResponseEntity.ok(ApiResponse.success("Reset password token verified successfully"));
+
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<?>> resetPassword(
+            @RequestBody @Valid ResetPasswordRequest dto
+    ) {
+        authService.resetPassword(dto.getResetToken(), dto.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
 }

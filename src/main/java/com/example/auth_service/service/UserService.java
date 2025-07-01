@@ -5,38 +5,62 @@ import com.example.auth_service.dto.RegisterRequest;
 import com.example.auth_service.entity.User;
 import com.example.auth_service.exception.DuplicateResourceException;
 import com.example.auth_service.exception.ResourceNotFoundException;
+import com.example.auth_service.exception.ValidationException;
 import com.example.auth_service.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserSessionService userSessionService;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, UserSessionService userSessionService) {
         this.userRepository = userRepository;
+        this.userSessionService = userSessionService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id.toString()));
+    //<editor-fold desc="Validation">
+    public void existsById(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User", userId.toString());
+        }
     }
 
+    public void existsActivelyByUsername(String username) {
+        if (!userRepository.existsByUsernameAndEnabledTrue(username)) {
+            throw new ResourceNotFoundException("User", username);
+        }
+    }
+
+    public void existsByEmail(String email) {
+        if (!userRepository.existsByEmail(email)) {
+            throw new ResourceNotFoundException("User", email);
+        }
+    }
+
+    public void existsActivelyByEmail(String email) {
+        if (!userRepository.existsByEmailAndEnabledTrue(email)) {
+            throw new ResourceNotFoundException("User", email);
+        }
+    }
+
+    //</editor-fold>
     @Override
     public User loadUserByUsername(String username) throws UsernameNotFoundException {
-        final var user = userRepository.findByUsername(username);
-        if (user.isEmpty()) {
-            throw new UsernameNotFoundException("User is not found with username " + username);
-        }
-        return user.get();
+        final var user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("User", username));
+        if (!user.isEnabled()) throw new ValidationException("User is not enabled");
+        return user;
     }
 
-    public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User", email));
+    public User getActiveUserByEmail(String email) {
+        return userRepository.findByEmailAndEnabledTrue(email).orElseThrow(() -> new ResourceNotFoundException("User", email));
     }
 
     public void createUser(RegisterRequest dto) {
@@ -61,9 +85,15 @@ public class UserService implements UserDetailsService {
     }
 
     public void deleteUser(Long userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new ResourceNotFoundException("User", userId.toString());
-        }
+        existsById(userId);
         userRepository.deleteById(userId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPasswordAndInvalidateSessions(String email, String newPassword) {
+        var user = getActiveUserByEmail(email);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user = userRepository.save(user);
+        userSessionService.revokeAllUserSessions(user.getId());
     }
 }
